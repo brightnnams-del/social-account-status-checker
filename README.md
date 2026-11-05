@@ -21,7 +21,7 @@ The first version does **not** claim to identify hidden restrictions on arbitrar
 4. Select Next.js.
 5. Set install command: `npm install`
 6. Set build command: `npm run build`
-7. Set output directory: ` .next ` (without spaces).
+7. Set output directory: ` .next 
 8. Deploy.
 
 Appwrite Sites supports Next.js deployments and server-side routes. Do not deploy this project as a static-only site; `/api/check` runs on the server.
