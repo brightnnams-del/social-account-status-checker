@@ -1,0 +1,149 @@
+ "use client";
+
+import { useState } from "react";
+
+const platforms = [
+  ["instagram", "Instagram"],
+  ["facebook", "Facebook"],
+  ["tiktok", "TikTok"],
+  ["x", "X (Twitter)"],
+  ["youtube", "YouTube"],
+  ["snapchat", "Snapchat"]
+];
+
+export default function Home() {
+  const [platform, setPlatform] = useState("instagram");
+  const [kind, setKind] = useState("username");
+  const [identifier, setIdentifier] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [report, setReport] = useState(null);
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    setError("");
+    setReport(null);
+
+    const value = identifier.trim();
+    if (!value) {
+      setError("Enter a username or profile link.");
+      return;
+    }
+    if (kind === "profile_url") {
+      try {
+        const parsed = new URL(value);
+        if (!["http:", "https:"].includes(parsed.protocol)) throw new Error();
+      } catch {
+        setError("Enter a valid profile link beginning with https://");
+        return;
+      }
+    }
+
+    setLoading(true);
+    try {
+      const response = await fetch("/api/check", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ platform, identifier: value, identifierType: kind })
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "The check could not be completed.");
+      setReport({ ...data, platform, searchedIdentifier: value });
+    } catch (err) {
+      setError(err.message || "Service unavailable. Please try again.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  function downloadReport() {
+    if (!report) return;
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "social-account-status-report.json";
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <>
+      <header className="topbar">
+        <a className="brand" href="#"><span className="brand-mark">S</span> StatusCheck</a>
+        <span className="top-note">SOCIAL ACCOUNT DIAGNOSTICS</span>
+      </header>
+
+      <main className="shell">
+        <section className="hero">
+          <div className="eyebrow">SOCIAL ACCOUNT DIAGNOSTICS</div>
+          <h1>Know what’s happening<br /><span>with your account.</span></h1>
+          <p className="intro">Check a social profile and get a clear report of what can be verified, what remains unknown, and where to confirm restrictions officially.</p>
+        </section>
+
+        <section className="panel">
+          <form onSubmit={handleSubmit}>
+            <div className="field">
+              <label htmlFor="platform">Social platform</label>
+              <select id="platform" value={platform} onChange={e => setPlatform(e.target.value)}>
+                {platforms.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select>
+            </div>
+
+            <div className="field">
+              <label>Search using</label>
+              <div className="segmented">
+                <label><input type="radio" name="kind" checked={kind === "username"} onChange={() => setKind("username")} /><span>Username</span></label>
+                <label><input type="radio" name="kind" checked={kind === "profile_url"} onChange={() => setKind("profile_url")} /><span>Profile link</span></label>
+              </div>
+            </div>
+
+            <div className="field">
+              <label htmlFor="identifier">{kind === "username" ? "Username" : "Public profile URL"}</label>
+              <input id="identifier" value={identifier} onChange={e => setIdentifier(e.target.value)}
+                placeholder={kind === "username" ? "e.g. yourusername" : "https://www.instagram.com/yourusername/"} maxLength={300} />
+              <small>Only check accounts you own or have permission to assess. Never enter a password, session cookie, or verification code.</small>
+            </div>
+
+            <button id="submit" type="submit" disabled={loading}>
+              <span>{loading ? "Checking…" : "Check account"}</span><span aria-hidden="true">→</span>
+            </button>
+          </form>
+          {error && <div className="error" role="alert">{error}</div>}
+        </section>
+
+        {report && (
+          <section className="report" aria-live="polite">
+            <div className="report-head">
+              <div><div className="eyebrow">CHECK REPORT</div><h2>Account assessment</h2></div>
+              <button className="secondary" onClick={downloadReport} type="button">Download report</button>
+            </div>
+            <div className="status-card">
+              <span className="pill">{report.status || "UNKNOWN"}</span>
+              <h3>{report.summary}</h3>
+              <p>{report.details}</p>
+            </div>
+            <div className="report-grid">
+              <div className="metric"><span>Platform</span><strong>{platforms.find(p => p[0] === report.platform)?.[1]}</strong></div>
+              <div className="metric"><span>Confidence</span><strong>{report.confidence || "None"}</strong></div>
+              <div className="metric"><span>Checked at</span><strong>{new Date(report.checkedAt).toLocaleString()}</strong></div>
+            </div>
+            <div className="report-section"><h3>What this means</h3><ul>{(report.limitations || []).map((x, i) => <li key={i}>{x}</li>)}</ul></div>
+            <div className="report-section"><h3>Recommended next steps</h3><ul>{(report.nextSteps || []).map((x, i) => <li key={i}>{x}</li>)}</ul></div>
+            <p className="disclaimer">This report is informational, not an official decision by the social platform. “Unknown” does not mean restricted or unrestricted.</p>
+          </section>
+        )}
+
+        <section className="how">
+          <h2>How it works</h2>
+          <div className="steps">
+            <div><b>01</b><strong>Choose a platform</strong><p>Select one of the six supported networks.</p></div>
+            <div><b>02</b><strong>Enter a profile</strong><p>Use a username or public profile URL.</p></div>
+            <div><b>03</b><strong>Review the report</strong><p>See what is verified, what is unknown, and the official next steps.</p></div>
+          </div>
+        </section>
+        <footer>Not affiliated with Meta, TikTok, X, Google/YouTube, or Snap Inc.</footer>
+      </main>
+    </>
+  );
+}
