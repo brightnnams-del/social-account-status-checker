@@ -1,0 +1,32 @@
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { getProviderAssessment } from "../../../lib/providers.js";
+
+const schema = z.object({
+  platform: z.enum(["instagram", "facebook", "tiktok", "x", "youtube", "snapchat"]),
+  identifier: z.string().trim().min(1).max(300),
+  identifierType: z.enum(["username", "profile_url"])
+});
+
+export async function POST(request) {
+  try {
+    const body = await request.json();
+    const parsed = schema.safeParse(body);
+    if (!parsed.success) {
+      return NextResponse.json({ error: "Please provide a valid platform and username or profile link." }, { status: 400 });
+    }
+
+    const result = await getProviderAssessment(parsed.data);
+    return NextResponse.json({ checkedAt: new Date().toISOString(), ...result });
+  } catch (error) {
+    console.error("Account assessment error:", error);
+    return NextResponse.json({
+      status: "UNKNOWN",
+      confidence: "none",
+      summary: "The platform could not be checked right now.",
+      details: "The verification service failed. Please try again later or use the platform's official account-status tools.",
+      limitations: ["No restriction conclusion can be drawn from a failed request."],
+      nextSteps: ["Try again later.", "Check the account directly in the official platform app."]
+    }, { status: 502 });
+  }
+}
